@@ -1,19 +1,15 @@
-import 'package:deneme/screen/sayfa.dart';
 import 'package:flutter/material.dart';
 
-import 'conta.dart';
-
-// EKSİK OLAN KISIM BURASI:
-void main() {
-  runApp(const MyWidget());
-}
-
-// Senin yazdığın widget buraya gelecek:
-class MyWidget extends StatelessWidget {
+class MyWidget extends StatefulWidget {
   const MyWidget({super.key});
 
   @override
+  State<MyWidget> createState() => _MyWidgetState();
+}
+
+class _MyWidgetState extends State<MyWidget> {
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(home: homes());
+    return const Placeholder();
   }
 }
