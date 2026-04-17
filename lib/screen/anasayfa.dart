@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-// Yeni oluşturduğumuz sayfayı buraya import etmeliyiz ki tanısın
-import 'package:deneme/screen/talep_ekle.dart'; // "deneme" yerine kendi proje adını yazmayı unutma!
+import 'package:deneme/screen/talep_ekle.dart';
+import 'package:deneme/screen/giris.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class anasayfa extends StatefulWidget {
   const anasayfa({super.key});
@@ -9,62 +10,89 @@ class anasayfa extends StatefulWidget {
   State<anasayfa> createState() => _anasayfaState();
 }
 
-// Geçici hafızamız (Uygulama kapanana kadar burada dururlar)
-List<Map<String, dynamic>> aktifTalepler = [
-  {
-    "baslik": "Defibrilatör Arızası",
-    "kategori": "Teknik Arıza",
-    "oncelik": "Kritik",
-  },
-  {"baslik": "Oksijen Tüpü", "kategori": "Lojistik İkmal", "oncelik": "Normal"},
-];
-
 class _anasayfaState extends State<anasayfa> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ANA LİSTE (Şimdilik örnek 2 tane talep koyalım)
-      body: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount:
-            aktifTalepler.length, // Listede kaç eleman varsa o kadar kart çiz
-        itemBuilder: (context, index) {
-          final talep = aktifTalepler[index];
-          // Kritikse kırmızı, normalse turuncu renk atayalım
-          Color renk = talep['oncelik'] == 'Kritik'
-              ? Colors.red
-              : Colors.orange;
+      appBar: AppBar(
+        title: const Text("AKTİF TALEPLER"),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.exit_to_app, color: Colors.red),
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const giris()),
+              );
+            },
+          ),
+        ],
+      ),
 
-          return _talepKarti(
-            talep['baslik'],
-            talep['kategori'],
-            talep['oncelik'],
-            renk,
+      // Firebase'den veriyi canlı çeken kısım
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('talepler')
+            .orderBy('olusturulma_tarihi', descending: true) // En yeni en üstte
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: SelectableText(
+                  "ASIL HATA ŞU: ${snapshot.error}",
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            );
+          }
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+
+          final docs = snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return const Center(child: Text("Henüz aktif talep yok."));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final veri = docs[index].data() as Map<String, dynamic>;
+
+              // Firebase'den gelen verilere göre kartı çiziyoruz
+              Color renk = (veri['oncelik'] == 'Kritik')
+                  ? Colors.red
+                  : Colors.orange;
+
+              return _talepKarti(
+                veri['baslik'] ?? 'Başlıksız',
+                veri['kategori'] ?? 'Kategorisiz',
+                veri['oncelik'] ?? 'Normal',
+                renk,
+              );
+            },
           );
         },
       ),
 
-      // İŞTE SENİN SORDUĞUN KISIM: TALEP EKLE BUTONU
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          // async ekledik çünkü diğer sayfanın kapanmasını bekleyeceğiz
-          // Form sayfasına git ve oradan gelecek "sonuc" verisini bekle
-          final sonuc = await Navigator.push(
+        onPressed: () {
+          Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const TalepEkle()),
           );
-
-          // Eğer kullanıcı formu doldurup gönderdiyse (geri tuşuna basıp boş dönmediyse)
-          if (sonuc != null) {
-            setState(() {
-              aktifTalepler.insert(
-                0,
-                sonuc,
-              ); // Yeni talebi listenin en tepesine ekle!
-            });
-          }
         },
-        backgroundColor: const Color(0xFF3F51B5), // Lacivert/Mavi tonumuz
+        backgroundColor: const Color(0xFF3F51B5),
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text(
           "YENİ TALEP",
@@ -74,7 +102,6 @@ class _anasayfaState extends State<anasayfa> {
     );
   }
 
-  // Listede görünecek kartların şablonu (Kod kalabalığı olmasın diye ayırdık)
   Widget _talepKarti(
     String baslik,
     String kategori,

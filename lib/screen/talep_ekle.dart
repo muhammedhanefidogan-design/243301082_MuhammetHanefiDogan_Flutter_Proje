@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TalepEkle extends StatefulWidget {
   const TalepEkle({super.key});
@@ -156,15 +157,50 @@ class _TalepEkleState extends State<TalepEkle> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  onPressed: () {
-                    // Yazılanları bir paket yapıp (Map) anasayfaya geri fırlatıyoruz!
-                    Navigator.pop(context, {
-                      'baslik': cihazController.text.isEmpty
-                          ? "Belirtilmedi"
-                          : cihazController.text,
-                      'kategori': seciliKategori,
-                      'oncelik': seciliOncelik,
-                    });
+                  onPressed: () async {
+                    // Eğer cihaz adı boşsa adamı uyaralım
+                    if (cihazController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Lütfen cihaz veya ihtiyaç adı giriniz!",
+                          ),
+                        ),
+                      );
+                      return; // Kodu burada durdur, aşağıya geçme
+                    }
+
+                    // Yükleniyor efekti vs istersen buraya eklenir, biz direkt yolluyoruz:
+                    try {
+                      // FİREBASE'E VERİYİ FIRLAT
+                      await FirebaseFirestore.instance.collection('talepler').add({
+                        'baslik': cihazController.text,
+                        'kategori': seciliKategori,
+                        'oncelik': seciliOncelik,
+                        'durum':
+                            'Bekliyor', // Yeni talepler hep bekliyor başlar
+                        'olusturulma_tarihi':
+                            FieldValue.serverTimestamp(), // Firebase kendi saatini ansızın basar!
+                      });
+
+                      // Başarı mesajı göster ve anasayfaya dön
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Tebrikler! Talep buluta başarıyla kaydedildi.",
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                      Navigator.pop(
+                        context,
+                      ); // Geçici veri ('sonuc') fırlatmayı sildik, sadece sayfayı kapatıyoruz.
+                    } catch (e) {
+                      // İnternet yoksa veya hata olursa burası çalışır
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Aman kanka bir hata oldu: $e")),
+                      );
+                    }
                   },
                   child: const Text(
                     "TALEBİ SİSTEME İŞLE",

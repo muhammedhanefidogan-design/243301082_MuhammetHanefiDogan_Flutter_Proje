@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:deneme/screen/giris.dart'; // Yeni oluşturduğun dosyayı tanıttık
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart'; // 🚨 İŞTE EKSİK OLAN HAYAT KURTARICI SATIR!
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 🚨 Firebase'i gizli anahtarlarımızla (options) uyandırıyoruz
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   runApp(const MyApp());
 }
 
