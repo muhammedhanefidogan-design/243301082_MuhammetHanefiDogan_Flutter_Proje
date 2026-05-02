@@ -104,7 +104,7 @@ class _girisState extends State<giris> {
                     child: TextField(
                       obscureText: _sifreGizli, // true ise şifre nokta gösterir
                       decoration: InputDecoration(
-                        hintText: "Şifre Belirleyiniz",
+                        hintText: "Şifrenizi Giriniz",
                         border: InputBorder.none,
                         suffixIcon: IconButton(
                           icon: Icon(
