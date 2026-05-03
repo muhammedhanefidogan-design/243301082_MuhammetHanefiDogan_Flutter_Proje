@@ -1,107 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:deneme/screen/giris.dart'; // Çıkış yapmak için giriş ekranını import ediyoruz
+import 'package:deneme/screen/giris.dart'; // Eğer çıkış butonu yapacaksan bunu da ekle
 
-class admin extends StatefulWidget {
-  const admin({super.key});
+class AdminAnasayfa extends StatefulWidget {
+  const AdminAnasayfa({super.key});
 
   @override
-  State<admin> createState() => _adminState();
+  State<AdminAnasayfa> createState() => _AdminAnasayfaState();
 }
 
-class _adminState extends State<admin> {
-  // 1. Veritabanında Durum Güncelleme Fonksiyonu
-  Future<void> updateStatus(String docId, String newStatus) async {
-    try {
-      await FirebaseFirestore.instance.collection('talepler').doc(docId).update(
-        {'durum': newStatus},
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Talep durumu güncellendi!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Hata oluştu: $e')));
-      }
-    }
-  }
-
-  // 2. Durum Değiştirme Pop-up'ı (Dialog)
-  void showStatusDialog(
-    BuildContext context,
-    String docId,
-    String currentStatus,
-  ) {
-    String selectedStatus = currentStatus;
-    // Adminin seçebileceği durum listesi
-    final List<String> statusOptions = [
-      'Bekliyor',
-      'İşleme Alındı',
-      'Tamamlandı',
-      'İptal Edildi',
-    ];
-
-    // Eğer mevcut durum listede yoksa, varsayılanı bekleme yap (Hata önleyici)
-    if (!statusOptions.contains(selectedStatus)) {
-      selectedStatus = 'Bekliyor';
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Durumu Güncelle'),
-          content: DropdownButtonFormField<String>(
-            value: selectedStatus,
-            items: statusOptions.map((status) {
-              return DropdownMenuItem(value: status, child: Text(status));
-            }).toList(),
-            onChanged: (val) {
-              if (val != null) {
-                selectedStatus = val;
-              }
-            },
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('İptal', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-              onPressed: () {
-                updateStatus(docId, selectedStatus);
-                Navigator.pop(context); // Dialogu kapat
-              },
-              child: const Text(
-                'Güncelle',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
+class _AdminAnasayfaState extends State<AdminAnasayfa> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF5F7F8),
       appBar: AppBar(
-        title: const Text('Admin Paneli - Tüm Talepler'),
-        backgroundColor: Colors.red[800],
+        title: const Text(
+          "ADMİN KONTROL PANELİ",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: const Color(0xFF001F3F),
         foregroundColor: Colors.white,
+        elevation: 0,
+        // 🚨 ÇIKIŞ BUTONUNU BURAYA EKLİYORUZ:
         actions: [
-          // Çıkış Yap Butonu
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.exit_to_app, color: Colors.redAccent),
+            tooltip: "Çıkış Yap",
             onPressed: () {
+              // Admin'i giriş ekranına geri gönderiyoruz ve geri dönmesini engelliyoruz
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const giris()),
@@ -110,127 +37,151 @@ class _adminState extends State<admin> {
           ),
         ],
       ),
-      // 3. Canlı Veri Çekme (StreamBuilder)
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('talepler')
-            .orderBy(
-              'olusturulma_tarihi',
-              descending: true,
-            ) // En yeni talepler en üstte
+            .orderBy('olusturulma_tarihi', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          // Yükleniyorsa veya hata varsa ekranı yönet
-          if (snapshot.hasError) {
-            return const Center(
-              child: Text('Veriler yüklenirken bir hata oluştu.'),
-            );
-          }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
-          final requests = snapshot.data!.docs;
-
-          // Eğer hiç talep yoksa
-          if (requests.isEmpty) {
-            return const Center(
-              child: Text(
-                'Sistemde henüz bir talep bulunmuyor.',
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-            );
+          if (snapshot.hasError) {
+            return Center(child: Text("Hata: ${snapshot.error}"));
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text("Bekleyen talep yok."));
           }
 
-          // Talepler varsa listele
+          var talepler = snapshot.data!.docs;
+
           return ListView.builder(
-            padding: const EdgeInsets.all(10),
-            itemCount: requests.length,
+            padding: const EdgeInsets.all(20),
+            itemCount: talepler.length,
             itemBuilder: (context, index) {
-              final req = requests[index];
-              final docId = req.id; // Firebase belgesinin benzersiz ID'si
+              // 🚨 Belgenin ID'sini (`doc.id`) ve verilerini alıyoruz
+              var doc = talepler[index];
+              var talep = doc.data() as Map<String, dynamic>;
+              String docId = doc.id;
 
-              // Verileri güvenli şekilde çek
-              final data = req.data() as Map<String, dynamic>;
-              final title = data['baslik'] ?? 'Başlık Yok';
-              final status = data['durum'] ?? 'Bekliyor';
-              final category = data['kategori'] ?? 'Kategori Yok';
-              final priority = data['oncelik'] ?? 'Normal';
-
-              // Duruma göre renk belirle ki admin kolayca ayırt etsin
-              Color statusColor = Colors.orange;
-              if (status == 'Tamamlandı') statusColor = Colors.green;
-              if (status == 'İptal Edildi') statusColor = Colors.red;
-              if (status == 'İşleme Alındı') statusColor = Colors.blue;
+              bool isKritik = talep['oncelik'] == 'Kritik';
+              Color durumRengi = isKritik ? Colors.red : Colors.orange;
+              bool isIslemde = talep['durum'] == 'İşlemde';
 
               return Card(
                 elevation: 4,
-                margin: const EdgeInsets.only(bottom: 12),
+                margin: const EdgeInsets.only(bottom: 15),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15),
+                  side: BorderSide(
+                    color: durumRengi.withOpacity(0.5),
+                    width: 2,
+                  ),
                 ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(15),
-                  leading: CircleAvatar(
-                    radius: 25,
-                    backgroundColor: statusColor.withOpacity(0.2),
-                    child: Icon(
-                      Icons.assignment_late,
-                      color: statusColor,
-                      size: 28,
-                    ),
-                  ),
-                  title: Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Kategori: $category',
-                          style: const TextStyle(color: Colors.black87),
-                        ),
-                        Text(
-                          'Öncelik: $priority',
-                          style: const TextStyle(color: Colors.black87),
-                        ),
-                        const SizedBox(height: 5),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            status,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              talep['baslik'] ?? 'İsimsiz',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  isThreeLine: true,
-                  // Kalem ikonuna basınca güncelleme pop-up'ı açılır
-                  trailing: IconButton(
-                    icon: const Icon(
-                      Icons.edit_document,
-                      color: Colors.indigo,
-                      size: 30,
-                    ),
-                    onPressed: () => showStatusDialog(context, docId, status),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: durumRengi.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              talep['oncelik'] ?? 'Belirsiz',
+                              style: TextStyle(
+                                color: durumRengi,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        "Kategori: ${talep['kategori'] ?? 'Belirsiz'}",
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // EĞER İŞLEMDEYSE ONAY İKONU, DEĞİLSE YÖNLENDİRME BUTONU
+                      isIslemde
+                          ? Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.green[50],
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.check_circle, color: Colors.green),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    "Birim Yönlendirildi",
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF3F51B5),
+                                minimumSize: const Size(double.infinity, 45),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              onPressed: () async {
+                                // 🚨 BURASI SİHİRLİ SATIR: Doğru ID'ye sahip talebi bul ve 'durum' alanını 'İşlemde' yap!
+                                await FirebaseFirestore.instance
+                                    .collection('talepler')
+                                    .doc(docId)
+                                    .update({'durum': 'İşlemde'});
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      "Talep güncellendi! Personel ekranına düşecek.",
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.send,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              label: const Text(
+                                "İLGİLİ BİRİME YÖNLENDİR",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                    ],
                   ),
                 ),
               );

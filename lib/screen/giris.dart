@@ -143,7 +143,9 @@ class _girisState extends State<giris> {
                     if (seciliRol == "Admin") {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => const admin()),
+                        MaterialPageRoute(
+                          builder: (context) => const AdminAnasayfa(),
+                        ),
                       );
                     } else {
                       Navigator.pushReplacement(

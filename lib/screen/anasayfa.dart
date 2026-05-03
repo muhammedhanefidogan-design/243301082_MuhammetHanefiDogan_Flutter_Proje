@@ -1,3 +1,4 @@
+// lib/screen/anasayfa.dart
 import 'package:flutter/material.dart';
 import 'package:deneme/screen/talep_ekle.dart';
 import 'package:deneme/screen/giris.dart';
@@ -32,30 +33,19 @@ class _anasayfaState extends State<anasayfa> {
         ],
       ),
 
-      // Firebase'den veriyi canlı çeken kısım
+      // 🚨 CANLI FİREBASE DİNLEYİCİSİ (StreamBuilder)
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('talepler')
-            .orderBy('olusturulma_tarihi', descending: true) // En yeni en üstte
+            .orderBy('olusturulma_tarihi', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: SelectableText(
-                  "ASIL HATA ŞU: ${snapshot.error}",
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            );
+            return Center(child: Text("Hata oluştu: ${snapshot.error}"));
           }
-          if (!snapshot.hasData)
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final docs = snapshot.data!.docs;
 
@@ -69,15 +59,18 @@ class _anasayfaState extends State<anasayfa> {
             itemBuilder: (context, index) {
               final veri = docs[index].data() as Map<String, dynamic>;
 
-              // Firebase'den gelen verilere göre kartı çiziyoruz
               Color renk = (veri['oncelik'] == 'Kritik')
                   ? Colors.red
                   : Colors.orange;
 
+              // 🚨 BURASI ÇOK ÖNEMLİ:
+              // Veritabanından gelen 'durum' alanını kartın içine direkt basıyoruz!
               return _talepKarti(
                 veri['baslik'] ?? 'Başlıksız',
                 veri['kategori'] ?? 'Kategorisiz',
                 veri['oncelik'] ?? 'Normal',
+                veri['durum'] ??
+                    'Bekliyor', // Admin bunu 'İşlemde' yapınca anında buraya yansıyacak!
                 renk,
               );
             },
@@ -102,10 +95,12 @@ class _anasayfaState extends State<anasayfa> {
     );
   }
 
+  // 🚨 KART ŞABLONU (Durumu veritabanından çekip gösteriyoruz)
   Widget _talepKarti(
     String baslik,
     String kategori,
-    String durum,
+    String oncelik,
+    String durum, // Admin'in güncellediği 'durum' buraya geliyor
     Color durumRengi,
   ) {
     return Card(
@@ -130,12 +125,25 @@ class _anasayfaState extends State<anasayfa> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              durum,
+              oncelik,
               style: TextStyle(color: durumRengi, fontWeight: FontWeight.bold),
             ),
-            const Text(
-              "Bekliyor",
-              style: TextStyle(color: Colors.grey, fontSize: 12),
+            const SizedBox(height: 5),
+            // 🚨 Admin "İşlemde" yapınca burası saniyesinde değişecek:
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: durum == 'İşlemde' ? Colors.green[50] : Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                durum,
+                style: TextStyle(
+                  color: durum == 'İşlemde' ? Colors.green : Colors.grey[700],
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),

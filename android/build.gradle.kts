@@ -1,12 +1,7 @@
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        // Firebase için bu satır OLMAZSA OLMAZ kanka:
-        classpath("com.google.gms:google-services:4.4.1")
-    }
+plugins {
+    id("com.android.application") version "8.11.1" apply false
+    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    id("com.google.gms.google-services") version "4.3.15" apply false
 }
 
 allprojects {
@@ -16,26 +11,11 @@ allprojects {
     }
 }
 
-// ... senin geri kalan buildDir ayarların burada aynen kalsın ...
-val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
-rootProject.layout.buildDirectory.value(newBuildDir)
-// ... devamı sende zaten ...
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-val newBuildDir: Directory =
-    rootProject.layout.buildDirectory
-        .dir("../../build")
-        .get()
-rootProject.layout.buildDirectory.value(newBuildDir)
+val newBuildDir = layout.buildDirectory.dir("../../build").get().asFile
+rootProject.layout.buildDirectory.value(layout.buildDirectory.dir("../../build/${project.name}").get())
 
 subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
+    project.layout.buildDirectory.value(rootProject.layout.buildDirectory.dir(project.name).get())
 }
 subprojects {
     project.evaluationDependsOn(":app")
