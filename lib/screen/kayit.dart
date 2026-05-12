@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Veritabanı işlemleri için gerekli
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:deneme/screen/giris.dart';
 
 class kayit extends StatefulWidget {
   const kayit({super.key});
@@ -9,92 +11,95 @@ class kayit extends StatefulWidget {
 }
 
 class _kayitState extends State<kayit> {
-  // Verileri okumak için Controller'lar (İngilizce standartlarına uygun)
-  final TextEditingController firstNameController = TextEditingController();
-  final TextEditingController lastNameController = TextEditingController();
-  final TextEditingController usernameController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  // 🚨 KONTROLCÜLER
+  final TextEditingController _adSoyadController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _sifreController = TextEditingController();
 
+  String seciliRol = "Personel"; // Varsayılan rol
   bool _sifreGizli = true;
+  bool _yukleniyor = false;
 
-  // Firebase Kayıt Fonksiyonu
-  Future<void> kayitOl() async {
-    // Alanların boş olup olmadığını kontrol ediyoruz
-    if (firstNameController.text.isEmpty ||
-        lastNameController.text.isEmpty ||
-        usernameController.text.isEmpty ||
-        passwordController.text.isEmpty) {
+  // 🚀 KAYIT OLMA FONKSİYONU
+  void _kayitOl() async {
+    final adSoyad = _adSoyadController.text.trim();
+    final email = _emailController.text.trim();
+    final sifre = _sifreController.text.trim();
+
+    if (adSoyad.isEmpty || email.isEmpty || sifre.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lütfen tüm alanları doldurunuz!')),
+        const SnackBar(
+          content: Text("Lütfen tüm alanları doldurun!"),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
 
+    setState(() {
+      _yukleniyor = true;
+    });
+
     try {
-      // Firebase Firestore 'users' koleksiyonuna verileri ekliyoruz
-      await FirebaseFirestore.instance.collection('users').add({
-        'firstName': firstNameController.text.trim(),
-        'lastName': lastNameController.text.trim(),
-        'username': usernameController.text.trim(),
-        'password': passwordController.text.trim(),
-        'role': 'Personel', // Varsayılan olarak sisteme kayıt olanlar personel
-        'createdAt': FieldValue.serverTimestamp(), // Kayıt tarihi
-      });
+      // 1. Firebase Auth ile Kullanıcı Oluştur
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: sifre);
 
-      // Başarılı mesajı göster
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Kayıt Başarılı! Giriş yapabilirsiniz.'),
-          ),
-        );
-        // Kayıt olduktan sonra giriş ekranına geri dön
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Bir hata oluştu: $e')));
-      }
-    }
-  }
+      // 2. Firestore'a Ad-Soyad ve Rol Bilgisini Kaydet
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
+            'adSoyad': adSoyad,
+            'email': email,
+            'rol': seciliRol,
+            'kayitTarihi': FieldValue.serverTimestamp(),
+          });
 
-  // Giriş ekranındaki aynı TextField tasarımını tekrar kullanmak için oluşturduğumuz özel widget
-  Widget buildCustomTextField({
-    required String hintText,
-    required TextEditingController controller,
-    bool isPassword = false,
-  }) {
-    return Card(
-      color: const Color(0xFFFFF0F0),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-        child: TextField(
-          controller: controller,
-          obscureText: isPassword ? _sifreGizli : false,
-          decoration: InputDecoration(
-            hintText: hintText,
-            border: InputBorder.none,
-            suffixIcon: isPassword
-                ? IconButton(
-                    icon: Icon(
-                      _sifreGizli ? Icons.visibility_off : Icons.visibility,
-                      color: Colors.grey,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _sifreGizli = !_sifreGizli;
-                      });
-                    },
-                  )
-                : null,
-          ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Kayıt başarıyla tamamlandı!"),
+          backgroundColor: Colors.green,
         ),
-      ),
-    );
+      );
+
+      // 3. Giriş Ekranına Yönlendir
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const giris()),
+      );
+    } on FirebaseAuthException catch (e) {
+      String mesaj = "Kayıt başarısız!";
+
+      // Detaylı hata kontrolü
+      if (e.code == 'email-already-in-use') {
+        mesaj = "Bu e-posta zaten kullanımda!";
+      } else if (e.code == 'weak-password') {
+        mesaj = "Şifre çok zayıf! (En az 6 karakter olmalı)";
+      } else if (e.code == 'invalid-email') {
+        mesaj = "Geçersiz e-posta formatı!";
+      } else {
+        mesaj = "Firebase Hatası: ${e.message}"; // Asıl hatayı burada görürüz
+      }
+
+      print(
+        "🚨 FIREBASE HATASI: ${e.code} - ${e.message}",
+      ); // Terminale de yazar
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mesaj), backgroundColor: Colors.red),
+      );
+    } catch (e) {
+      print("🚨 BEKLENMEDIK HATA: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Bir hata oluştu: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _yukleniyor = false);
+    }
   }
 
   @override
@@ -102,11 +107,8 @@ class _kayitState extends State<kayit> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
+        title: const Text("Yeni Kayıt"),
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(
-          color: Colors.black,
-        ), // Geri butonu rengi
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -114,58 +116,121 @@ class _kayitState extends State<kayit> {
             padding: const EdgeInsets.all(20.0),
             child: Column(
               children: [
+                const Icon(Icons.person_add, size: 80, color: Colors.red),
+                const SizedBox(height: 20),
                 const Text(
-                  "YENİ KAYIT",
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
+                  "Sisteme Kayıt Ol",
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 30),
 
-                // Ad ve Soyad yan yana da olabilir, alt alta da. Şimdilik alt alta koydum.
-                buildCustomTextField(
-                  hintText: "Ad",
-                  controller: firstNameController,
+                // 👤 AD SOYAD KARTI
+                _buildInputCard(_adSoyadController, "Ad Soyad", Icons.person),
+                const SizedBox(height: 15),
+
+                // 📧 E-POSTA KARTI
+                _buildInputCard(
+                  _emailController,
+                  "E-posta",
+                  Icons.email,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 15),
+
+                // 🔑 ŞİFRE KARTI
+                Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 5,
+                    ),
+                    child: TextField(
+                      controller: _sifreController,
+                      obscureText: _sifreGizli,
+                      decoration: InputDecoration(
+                        hintText: "Şifre",
+                        border: InputBorder.none,
+                        icon: const Icon(Icons.lock, color: Colors.redAccent),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _sifreGizli
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () =>
+                              setState(() => _sifreGizli = !_sifreGizli),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 20),
 
-                buildCustomTextField(
-                  hintText: "Soyad",
-                  controller: lastNameController,
+                // 🎭 ROL SEÇİMİ
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ChoiceChip(
+                      label: const Text("Personel"),
+                      selected: seciliRol == "Personel",
+                      onSelected: (val) =>
+                          setState(() => seciliRol = "Personel"),
+                    ),
+                    const SizedBox(width: 10),
+                    ChoiceChip(
+                      label: const Text("Admin"),
+                      selected: seciliRol == "Admin",
+                      onSelected: (val) => setState(() => seciliRol = "Admin"),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 30),
 
-                buildCustomTextField(
-                  hintText: "Kullanıcı Adı",
-                  controller: usernameController,
-                ),
-                const SizedBox(height: 20),
-
-                buildCustomTextField(
-                  hintText: "Şifre Belirleyiniz",
-                  controller: passwordController,
-                  isPassword: true,
-                ),
-                const SizedBox(height: 40),
-
-                // KAYIT BUTONU
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(200, 50),
-                    backgroundColor: Colors.indigo,
-                  ),
-                  onPressed:
-                      kayitOl, // Butona basıldığında Firebase fonksiyonu çalışır
-                  child: const Text(
-                    "KAYIT OL",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
+                // 🚀 KAYIT BUTONU
+                _yukleniyor
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(200, 50),
+                          backgroundColor: Colors.red,
+                        ),
+                        onPressed: _kayitOl,
+                        child: const Text(
+                          "KAYDI TAMAMLA",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Yardımcı Widget: Giriş Kartları için
+  Widget _buildInputCard(
+    TextEditingController controller,
+    String hint,
+    IconData icon, {
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+        child: TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: hint,
+            border: InputBorder.none,
+            icon: Icon(icon, color: Colors.redAccent),
           ),
         ),
       ),

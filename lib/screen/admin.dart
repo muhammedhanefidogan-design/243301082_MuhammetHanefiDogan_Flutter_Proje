@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:deneme/screen/giris.dart'; // Eğer çıkış butonu yapacaksan bunu da ekle
+import 'package:deneme/screen/profil.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminAnasayfa extends StatefulWidget {
   const AdminAnasayfa({super.key});
@@ -15,26 +19,61 @@ class _AdminAnasayfaState extends State<AdminAnasayfa> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7F8),
       appBar: AppBar(
-        title: const Text(
-          "ADMİN KONTROL PANELİ",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: const Color(0xFF001F3F),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        // 🚨 ÇIKIŞ BUTONUNU BURAYA EKLİYORUZ:
+        title: const Text("Acil Servis Paneli"),
+        backgroundColor: Colors.redAccent,
         actions: [
+          // 👤 PROFİL İKONU
           IconButton(
-            icon: const Icon(Icons.exit_to_app, color: Colors.redAccent),
-            tooltip: "Çıkış Yap",
+            icon: const Icon(Icons.account_circle),
+            tooltip: "Profilim",
             onPressed: () {
-              // Admin'i giriş ekranına geri gönderiyoruz ve geri dönmesini engelliyoruz
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const giris()),
+                MaterialPageRoute(builder: (context) => const ProfilSayfasi()),
               );
             },
           ),
+
+          // 🚪 ÇIKIŞ İKONU
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Çıkış Yap",
+            onPressed: () async {
+              // Kullanıcıya emin misin diye sormak fiyakalı olur
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Çıkış Yap"),
+                  content: const Text(
+                    "Oturumu kapatmak istediğinize emin misiniz?",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("İptal"),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await FirebaseAuth.instance
+                            .signOut(); // Firebase oturumunu kapat
+                        // Giriş ekranına dön ve arkadaki tüm sayfaları temizle
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/',
+                          (route) => false,
+                        );
+                      },
+                      child: const Text(
+                        "Çıkış Yap",
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8), // En sağda biraz boşluk kalsın
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(

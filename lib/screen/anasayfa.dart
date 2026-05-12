@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:deneme/screen/talep_ekle.dart';
 import 'package:deneme/screen/giris.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:deneme/screen/profil.dart';
+import 'package:deneme/firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class anasayfa extends StatefulWidget {
   const anasayfa({super.key});
@@ -16,20 +21,61 @@ class _anasayfaState extends State<anasayfa> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("AKTİF TALEPLER"),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        title: const Text("Acil Servis Paneli"),
+        backgroundColor: Colors.redAccent,
         actions: [
+          // 👤 PROFİL İKONU
           IconButton(
-            icon: const Icon(Icons.exit_to_app, color: Colors.red),
+            icon: const Icon(Icons.account_circle),
+            tooltip: "Profilim",
             onPressed: () {
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const giris()),
+                MaterialPageRoute(builder: (context) => const ProfilSayfasi()),
               );
             },
           ),
+
+          // 🚪 ÇIKIŞ İKONU
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Çıkış Yap",
+            onPressed: () async {
+              // Kullanıcıya emin misin diye sormak fiyakalı olur
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Çıkış Yap"),
+                  content: const Text(
+                    "Oturumu kapatmak istediğinize emin misiniz?",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("İptal"),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await FirebaseAuth.instance
+                            .signOut(); // Firebase oturumunu kapat
+                        // Giriş ekranına dön ve arkadaki tüm sayfaları temizle
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/',
+                          (route) => false,
+                        );
+                      },
+                      child: const Text(
+                        "Çıkış Yap",
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8), // En sağda biraz boşluk kalsın
         ],
       ),
 

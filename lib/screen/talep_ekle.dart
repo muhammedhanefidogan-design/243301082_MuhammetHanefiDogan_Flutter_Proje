@@ -17,7 +17,7 @@ class _TalepEkleState extends State<TalepEkle> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F8), // Ferah arka plan
+      backgroundColor: const Color(0xFFF5F7F8), 
       appBar: AppBar(
         title: const Text("YENİ TALEP OLUŞTUR"),
         backgroundColor: Colors.white,
